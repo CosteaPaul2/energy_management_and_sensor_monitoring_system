@@ -1,0 +1,37 @@
+version: '3'
+
+services:
+  db:
+    image: mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'city-db'
+      MYSQL_ROOT_PASSWORD: 'root'
+    ports:
+      - "3307:3306"
+    volumes:
+      - my-db:/var/lib/mysql
+    networks:
+      demo_net:
+  spring-demo:
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_IP=db
+      - DB_PORT=3306
+      - DB_DBNAME=city-db
+      - DB_USER=root
+      - DB_PASSWORD=root
+    networks:
+      demo_net:
+        ipv4_address: 172.30.0.2
+
+volumes:
+  my-db:
+
+networks:
+  demo_net:
+    external: true
