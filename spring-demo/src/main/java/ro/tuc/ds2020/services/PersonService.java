@@ -93,9 +93,10 @@ public class PersonService {
     }
 
     public void assignUserToDevice(UUID deviceId, UUID userId, String username, HttpServletRequest request) {
-        String url = "http://devices-spring:8082/device/assignUserToDevice?deviceId=" + deviceId + "&userId=" + userId + "&username=" + username;
+        String token = getTokenFromRequest(request);
+        System.out.println(token);
+        String url = "http://reverse-proxy/devices-spring/device/assignUserToDevice?deviceId=" + deviceId + "&userId=" + userId + "&username=" + username;
         try {
-            String token = getTokenFromRequest(request);
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + token);
             HttpEntity<Void> entity = new HttpEntity<>(headers);

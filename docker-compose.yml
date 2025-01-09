@@ -1,9 +1,23 @@
-version: '3.8'  # Specify version if needed
-
 services:
+  reverse-proxy:
+    image: traefik:v3.2
+    command: 
+      - --api.insecure=true
+      - --providers.docker
+      - --accesslog=true
+      - --accesslog.filepath=/var/log/traefik/access.log
+      - --log.level=DEBUG
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+      - "8082:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - ds-network
+
   postgres-city-db:
     image: postgres:17
-    container_name: postgres-city-db
     environment:
       POSTGRES_DB: city-db
       POSTGRES_USER: postgres
@@ -17,10 +31,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ds-network
 
   postgres-device-db:
     image: postgres:17
-    container_name: postgres-device-db
     environment:
       POSTGRES_DB: device-db
       POSTGRES_USER: postgres
@@ -34,6 +49,42 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ds-network
+
+  postgres-monitoring-db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: monitoring-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_monitoring_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ds-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672" 
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ds-network
 
   city-spring:
     build:
@@ -44,11 +95,20 @@ services:
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: admin
-      DB_DBNAME: city-db  # Database for the first Java app
+      DB_DBNAME: city-db
     depends_on:
       - postgres-city-db
-    ports:
-      - "8081:8081"
+    deploy:
+      replicas: 2
+    networks:
+      - ds-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.city-spring.rule=Host(`city-spring.localhost`) || PathPrefix(`/city-spring`)"
+      - "traefik.http.middlewares.city-spring-strip.stripprefix.prefixes=/city-spring"
+      - "traefik.http.routers.city-spring.middlewares=city-spring-strip"
+      - "traefik.http.services.city-spring.loadbalancer.server.port=8081"
+      - "traefik.http.middlewares.city-spring.headers.customrequestheaders.Authorization=Authorization"
 
   devices-spring:
     build:
@@ -59,11 +119,56 @@ services:
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: admin
-      DB_DBNAME: device-db  # Database for the second Java app
+      DB_DBNAME: device-db
     depends_on:
       - postgres-device-db
-    ports:
-      - "8082:8082"
+    deploy:
+      replicas: 2
+    networks:
+      - ds-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.devices-spring.rule=Host(`devices-spring.localhost`) || PathPrefix(`/devices-spring`)"
+      - "traefik.http.middlewares.devices-spring-strip.stripprefix.prefixes=/devices-spring"
+      - "traefik.http.routers.devices-spring.middlewares=devices-spring-strip"
+      - "traefik.http.services.devices-spring.loadbalancer.server.port=8082" 
+
+  monitoring-spring:
+    build:
+      context: ./monitoring
+      dockerfile: Dockerfile
+    environment:
+      DB_IP: postgres-monitoring-db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: admin
+      DB_DBNAME: monitoring-db
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+    depends_on:
+      - postgres-monitoring-db
+      - rabbitmq
+    networks:
+      - ds-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.monitoring-spring.rule=Host(`monitoring-spring.localhost`) || PathPrefix(`/monitoring-spring`)"
+      - "traefik.http.middlewares.monitoring-spring-strip.stripprefix.prefixes=/monitoring-spring"
+      - "traefik.http.routers.monitoring-spring.middlewares=monitoring-spring-strip"
+      - "traefik.http.services.monitoring-spring.loadbalancer.server.port=8087"
+    
+  chat-spring:
+    build:
+      context: ./chat
+      dockerfile: Dockerfile
+    networks:
+      - ds-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chat-spring.rule=Host(`chat-spring.localhost`) || PathPrefix(`/chat-spring`)"
+      - "traefik.http.middlewares.chat-spring-strip.stripprefix.prefixes=/chat-spring"
+      - "traefik.http.routers.chat-spring.middlewares=chat-spring-strip"
+      - "traefik.http.services.chat-spring.loadbalancer.server.port=8089"
 
   react-app:
     build:
@@ -71,12 +176,26 @@ services:
       dockerfile: Dockerfile
     environment:
       PORT: 5173
+    networks:
+      - ds-network
     ports:
       - "5173:5173"
     depends_on:
       - city-spring
       - devices-spring
+      - monitoring-spring
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.react-app.rule=Host(`react-app.localhost`) || PathPrefix(`/react-app`)"
+      - "traefik.http.middlewares.react-app-strip.stripprefix.prefixes=/react-app"
+      - "traefik.http.routers.react-app.middlewares=react-app-strip"
+      - "traefik.http.services.react-app.loadbalancer.server.port=5173"
 
 volumes:
   postgres_city_data:
   postgres_device_data:
+  postgres_monitoring_data:
+
+networks:
+  ds-network: 
+    driver: bridge

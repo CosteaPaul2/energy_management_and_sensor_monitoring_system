@@ -17,5 +17,7 @@ public class DeviceDetailsDTO {
     private UUID id;
     private String name;
     private UUID userId;
+    private String description;
+    private double hourlyConsumption;
 
 }

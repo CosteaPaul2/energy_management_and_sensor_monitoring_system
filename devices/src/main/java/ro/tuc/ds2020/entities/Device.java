@@ -24,6 +24,12 @@ public class Device implements Serializable {
     @Column(name = "name", nullable = false)
     private String name;
 
+    @Column(name = "description", nullable = false)
+    private String description;
+
+    @Column(name = "hourlyConsumption", nullable = false)
+    private double hourlyConsumption;
+
     @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_id", referencedColumnName = "user_id", nullable = true)
     private User user;

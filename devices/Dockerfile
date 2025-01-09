@@ -21,6 +21,8 @@ ENV DB_DBNAME=device-db
 COPY --from=builder /root/dependencies/ ./
 COPY --from=builder /root/snapshot-dependencies/ ./
 
+EXPOSE 8082
+
 RUN sleep 10
 COPY --from=builder /root/spring-boot-loader/ ./
 COPY --from=builder /root/application/ ./

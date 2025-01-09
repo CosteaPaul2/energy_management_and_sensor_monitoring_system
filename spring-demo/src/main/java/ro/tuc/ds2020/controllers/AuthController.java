@@ -23,7 +23,6 @@ import ro.tuc.ds2020.security.JWTProvider;
 import ro.tuc.ds2020.services.PersonService;
 
 import java.util.Collections;
-
 @CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/auth")

@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 @RequestMapping(value = "/device")
 public class DeviceController {
 
@@ -94,7 +94,11 @@ public class DeviceController {
         DeviceDTO updatedDevice = deviceService.unassignUserFromDevice(deviceId);
         return ResponseEntity.ok(updatedDevice);
     }
-
+    @GetMapping("/{deviceId}/max-consumption")
+    public ResponseEntity<Double> getMaxConsumption(@PathVariable UUID deviceId) {
+        double maxConsumption = deviceService.findDeviceById(deviceId).getHourlyConsumption();
+        return new ResponseEntity<>(maxConsumption, HttpStatus.OK);
+    }
 
 
 }

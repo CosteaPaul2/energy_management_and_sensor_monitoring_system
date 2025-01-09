@@ -13,10 +13,14 @@ public class DeviceBuilder {
 
     public static DeviceDTO toDeviceDTO(Device device) {
         UUID userId = device.getUser() != null ? device.getUser().getId() : null;
-        return new DeviceDTO(device.getId(), device.getName(), userId);
+        return new DeviceDTO(device.getId(), device.getName(), userId, device.getDescription(), device.getHourlyConsumption());
     }
 
     public static Device toEntity(DeviceDetailsDTO deviceDetailsDTO, User user) {
-        return new Device(deviceDetailsDTO.getName(), user);
+        Device device = new Device(deviceDetailsDTO.getName(), user);
+        device.setDescription(deviceDetailsDTO.getDescription());
+        device.setHourlyConsumption(deviceDetailsDTO.getHourlyConsumption());
+        return device;
     }
+
 }
